@@ -385,7 +385,7 @@
         "Node name for S&R": "KSampler"
       },
       "widgets_values": [
-        19910963104434,
+        342313698908058,
         "randomize",
         30,
         4,
@@ -401,10 +401,10 @@
         -311,
         672
       ],
-      "size": [
-        442.5632189453129,
-        371.4585211425783
-      ],
+      "size": {
+        "0": 442.563232421875,
+        "1": 371.4585266113281
+      },
       "flags": {},
       "order": 3,
       "mode": 0,
@@ -485,16 +485,42 @@
       ]
     },
     {
+      "id": 62,
+      "type": "SaveImage",
+      "pos": [
+        2115,
+        210
+      ],
+      "size": {
+        "0": 645.43310546875,
+        "1": 507.7357482910156
+      },
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 259
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "idle_all"
+      ]
+    },
+    {
       "id": 35,
       "type": "Prompts",
       "pos": [
         283,
         66
       ],
-      "size": [
-        383.8943511272953,
-        375.9945411768108
-      ],
+      "size": {
+        "0": 383.89434814453125,
+        "1": 375.9945373535156
+      },
       "flags": {},
       "order": 4,
       "mode": 0,
@@ -667,73 +693,8 @@
         }
       },
       "widgets_values": [
-        "realistic photograph on a solid gray background, high fantasy warrior, white male, messy brown hair, wearing plated armor with leather straps, 4 portraits of the same person, facing front, facing side, facing back, and stretching view",
+        "realistic photograph on a solid gray background, high fantasy witch, white female with black hair and light purple streaks, fully clothed with long robes, dark gray mage robes built for casting, perfect face, perfect skin, 4 portraits of the same person, facing front, facing side, facing back, and stretching view",
         "text, watermark, sword, shield, weapon, holding, nude, sexy, hood"
-      ]
-    },
-    {
-      "id": 49,
-      "type": "ControlNetApplyAdvanced",
-      "pos": [
-        1180,
-        240
-      ],
-      "size": {
-        "0": 315,
-        "1": 166
-      },
-      "flags": {},
-      "order": 12,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "link": 98
-        },
-        {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "link": 99
-        },
-        {
-          "name": "control_net",
-          "type": "CONTROL_NET",
-          "link": 105
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 104
-        }
-      ],
-      "outputs": [
-        {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "links": [
-            102
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "links": [
-            101
-          ],
-          "shape": 3,
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ControlNetApplyAdvanced"
-      },
-      "widgets_values": [
-        0.8,
-        0,
-        0.5
       ]
     },
     {
@@ -796,35 +757,74 @@
         "Node name for S&R": "ControlNetApplyAdvanced"
       },
       "widgets_values": [
-        1,
+        0.8,
         0,
         0.8
       ]
     },
     {
-      "id": 62,
-      "type": "SaveImage",
+      "id": 49,
+      "type": "ControlNetApplyAdvanced",
       "pos": [
-        2115,
-        210
+        1180,
+        240
       ],
       "size": {
-        "0": 645.43310546875,
-        "1": 507.7357482910156
+        "0": 315,
+        "1": 166
       },
       "flags": {},
-      "order": 15,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {
-          "name": "images",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 98
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 99
+        },
+        {
+          "name": "control_net",
+          "type": "CONTROL_NET",
+          "link": 105
+        },
+        {
+          "name": "image",
           "type": "IMAGE",
-          "link": 259
+          "link": 104
         }
       ],
-      "properties": {},
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            102
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            101
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ControlNetApplyAdvanced"
+      },
       "widgets_values": [
-        "idle_all"
+        0.6,
+        0,
+        0.5
       ]
     }
   ],
