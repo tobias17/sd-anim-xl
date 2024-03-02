@@ -48,9 +48,15 @@ class OpenPoseWarp:
         mask = cv2.inRange(hsv_pose_img, np.array([hue-2,0.98,0.58]), np.array([hue+2,1.02,0.62]))
         where = np.where(mask > 200)
 
-        x1, x2 = min(where[1]), max(where[1])
-        y1, y2 = min(np.where(mask[:,x1:x1+2] > 200)[0]), max(np.where(mask[:,x2-1:x2+1] > 200)[0])
-        return self.scale_point(x1, y1), self.scale_point(x2, y2)
+        x1_h, x2_h = min(where[1]), max(where[1])
+        y1_h, y2_h = min(np.where(mask[:,x1_h:x1_h+2] > 200)[0]), max(np.where(mask[:,x2_h-1:x2_h+1] > 200)[0])
+
+        y1_v, y2_v = min(where[0]), max(where[0])
+        x1_v, x2_v = min(np.where(mask[y1_v:y1_v+2,:] > 200)[1]), max(np.where(mask[y2_v-1:y2_v+1,:] > 200)[1])
+
+        if ((x2_h-x1_h)**2 + (y2_h-y1_h)**2) > ((x2_v-x1_v)**2 + (y2_v-y1_v)**2):
+            return self.scale_point(x1_h, y1_h), self.scale_point(x2_h, y2_h)
+        return self.scale_point(x1_v, y1_v), self.scale_point(x2_v, y2_v)
 
     def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor):
         assert stretch_image.shape[0] == 1 and stretch_pose.shape[0] == 1, "cannot have a batch larger than 1 for stretch image and pose"
