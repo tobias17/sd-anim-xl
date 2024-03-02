@@ -47,7 +47,10 @@ class OpenPoseWarp:
         assert hue is not None, f"failed to find body part key '{body_part}' in hue_index dict"
         mask = cv2.inRange(hsv_pose_img, np.array([hue-2,0.98,0.58]), np.array([hue+2,1.02,0.62]))
         where = np.where(mask > 200)
-        return self.scale_point(min(where[1]), min(where[0])), self.scale_point(max(where[1]), max(where[0]))
+
+        x1, x2 = min(where[1]), max(where[1])
+        y1, y2 = min(np.where(mask[:,x1:x1+2] > 200)[0]), max(np.where(mask[:,x2-1:x2+1] > 200)[0])
+        return self.scale_point(x1, y1), self.scale_point(x2, y2)
 
     def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor):
         assert stretch_image.shape[0] == 1 and stretch_pose.shape[0] == 1, "cannot have a batch larger than 1 for stretch image and pose"
@@ -64,8 +67,8 @@ class OpenPoseWarp:
         print(p1, p2)
 
         stretch_image = stretch_image
-        cv2.circle(stretch_image, p1, 5, (0,0,255), 8)
-        cv2.circle(stretch_image, p2, 5, (0,255,0), 8)
+        cv2.circle(stretch_image, p1, 3, (0,0,255), 8)
+        cv2.circle(stretch_image, p2, 3, (0,255,0), 8)
 
         return [Tensor(stretch_image).reshape((1,*stretch_image.shape))]
 
