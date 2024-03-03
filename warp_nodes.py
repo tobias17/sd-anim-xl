@@ -6,11 +6,11 @@ from typing import Tuple
 
 hue_index = {
     'head': 0,
-    'leg_right_lower': 20,
-    'leg_right_upper': 40,
+    'leg_left_lower': 20,
+    'leg_left_upper': 40,
     'torso_left': 60,
-    'leg_left_lower': 80,
-    'leg_left_upper': 100,
+    'leg_right_lower': 80,
+    'leg_right_upper': 100,
     'torso_right': 120,
     'arm_left_lower': 140,
     'arm_left_upper': 160,
@@ -116,6 +116,7 @@ class OpenPoseWarp:
                 "right_leg_mask": ("MASK",),
                 "left_leg_mask":  ("MASK",),
                 "target_pose":    ("IMAGE",),
+                "debug":          ("BOOLEAN", {"default": True}),
             }
         }
     
@@ -124,7 +125,7 @@ class OpenPoseWarp:
     RETURN_NAMES = ("target_pose",)
     FUNCTION = "open_pose_warp"
 
-    def extract_component(self, hsv_pose_img:np.ndarray, body_part:str) -> TransformComponent:
+    def extract_points(self, hsv_pose_img:np.ndarray, body_part:str) -> Tuple[Vector2,Vector2]:
         hue = hue_index.get(body_part, None)
         assert hue is not None, f"failed to find body part key '{body_part}' in hue_index dict"
         mask = cv2.inRange(hsv_pose_img, np.array([hue-2,0.98,0.58]), np.array([hue+2,1.02,0.62]))
@@ -137,43 +138,67 @@ class OpenPoseWarp:
         x1_v, x2_v = min(np.where(mask[y1_v:y1_v+2,:] > 200)[1]), max(np.where(mask[y2_v-1:y2_v+1,:] > 200)[1])
 
         if ((x2_h-x1_h)**2 + (y2_h-y1_h)**2) > ((x2_v-x1_v)**2 + (y2_v-y1_v)**2):
-            return TransformComponent(Vector2(x1_h, y1_h)*self.rescale, Vector2(x2_h, y2_h)*self.rescale)
-        return     TransformComponent(Vector2(x1_v, y1_v)*self.rescale, Vector2(x2_v, y2_v)*self.rescale)
+            return Vector2(x1_h, y1_h)*self.rescale, Vector2(x2_h, y2_h)*self.rescale
+        return     Vector2(x1_v, y1_v)*self.rescale, Vector2(x2_v, y2_v)*self.rescale
+
+    def extract_comps_and_bound(self, hsv_pose_img:np.ndarray, key1:str, key2:str) -> Tuple[TransformComponent,TransformComponent,TransformBoundary]:
+        p1, p2 = self.extract_points(hsv_pose_img, key1)
+        p3, p4 = self.extract_points(hsv_pose_img, key2)
+        dists = [
+            ((p1-p3).length(), lambda: (p2,p1,p3,p4)),
+            ((p1-p4).length(), lambda: (p2,p1,p4,p3)),
+            ((p2-p3).length(), lambda: (p1,p2,p3,p4)),
+            ((p2-p4).length(), lambda: (p1,p2,p4,p3)),
+        ]
+        dists = sorted(dists, key=lambda v: v[0])
+        print(dists)
+        p1,p2,p3,p4 = dists[0][1]()
+        p2 = p3 = (p2+p3)*0.5
+        c1,c2 = TransformComponent(p1,p2), TransformComponent(p3,p4)
+        return c1, c2, TransformBoundary(c1,c2)
 
     def clean_mask(self, mask:Tensor) -> np.ndarray:
         assert mask.shape[0], f"masks must be of batch size 1, found {mask.shape[0]}"
         mask_np = mask[0].numpy()
         return mask_np.reshape((*mask_np.shape,1))
 
-    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor):
+    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor, debug:bool):
         assert stretch_image.shape[0] == 1 and stretch_pose.shape[0] == 1, "cannot have a batch larger than 1 for stretch image and pose"
-        stretch_image = stretch_image[0].numpy()
-        stretch_pose  = stretch_pose[0].numpy()
-        if stretch_pose.shape != stretch_image.shape:
-            r = list(stretch_image.shape[i] / stretch_pose.shape[i] for i in range(2))
+        stretch_image_np: np.ndarray = stretch_image[0].numpy()
+        stretch_pose_np:  np.ndarray = stretch_pose[0].numpy()
+        if stretch_pose_np.shape != stretch_image_np.shape:
+            r = list(stretch_image_np.shape[i] / stretch_pose_np.shape[i] for i in range(2))
         else:
             r = (1.0,1.0)
-        self.rescale = Vector2(*r[::-1])
+        self.rescale = Vector2(r[1], r[0])
 
-        body_mask      = self.clean_mask(body_mask)
-        right_arm_mask = self.clean_mask(right_arm_mask)
-        left_arm_mask  = self.clean_mask(left_arm_mask)
-        right_leg_mask = self.clean_mask(right_leg_mask)
-        left_leg_mask  = self.clean_mask(left_leg_mask)
+        images = [stretch_image_np]
 
-        hsv_pose_img = cv2.cvtColor(stretch_pose, cv2.COLOR_BGR2HSV)
+        body_mask_np      = self.clean_mask(body_mask)
+        right_arm_mask_np = self.clean_mask(right_arm_mask)
+        left_arm_mask_np  = self.clean_mask(left_arm_mask)
+        right_leg_mask_np = self.clean_mask(right_leg_mask)
+        left_leg_mask_np  = self.clean_mask(left_leg_mask)
 
-        c1 = self.extract_component(hsv_pose_img, 'leg_right_upper')
-        c2 = self.extract_component(hsv_pose_img, 'leg_right_lower')
-        b = TransformBoundary(c1, c2)
+        hsv_pose_img = cv2.cvtColor(stretch_pose_np, cv2.COLOR_BGR2HSV)
+        s_comp1, s_comp2, s_bound = self.extract_comps_and_bound(hsv_pose_img, 'leg_left_upper', 'leg_left_lower')
 
-        background_img = np.ones(stretch_image.shape) * 0.5
+        background_img = np.ones(stretch_image_np.shape) * 0.5
 
-        left_leg_img = stretch_image*left_leg_mask + background_img*(1.0-left_leg_mask)
-        c1.draw_debug_on(left_leg_img, (0,0,255))
-        c2.draw_debug_on(left_leg_img, (0,255,0))
+        if debug:
+            db_img = stretch_image_np.copy()
+            db_img = db_img*left_leg_mask_np + background_img*(1.0-left_leg_mask_np)
+            s_comp1.draw_debug_on(db_img, (0,0,255))
+            s_comp2.draw_debug_on(db_img, (0,255,0))
+            s_bound.draw_debug_on(db_img, s_comp1.p2, 20, (255,0,0), 4)
+            images.append(db_img)
 
-        return [Tensor(left_leg_img).reshape((1,*left_leg_img.shape))]
+        output = Tensor(images[0])
+        output = output.reshape((1,*output.shape)).expand((len(images),*output.shape))
+        for i in range(1, len(images)):
+            output[i] = Tensor(images[i])
+
+        return [output]
 
 NODE_CLASS_MAPPINGS = {
     "OpenPoseWarp": OpenPoseWarp,
