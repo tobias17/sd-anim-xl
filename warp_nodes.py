@@ -172,7 +172,7 @@ class OpenPoseWarp:
             r = (1.0,1.0)
         self.rescale = Vector2(r[1], r[0])
 
-        images = [stretch_image_np]
+        images = [stretch_image_np.copy()]
 
         body_mask_np      = self.clean_mask(body_mask)
         right_arm_mask_np = self.clean_mask(right_arm_mask)
@@ -192,13 +192,12 @@ class OpenPoseWarp:
             s_comp2.draw_debug_on(db_img, (0,255,0))
             s_bound.draw_debug_on(db_img, s_comp1.p2, 20, (255,0,0), 4)
             images.append(db_img)
+            images.append(stretch_pose)
 
-        output = Tensor(images[0])
-        output = output.reshape((1,*output.shape)).expand((len(images),*output.shape))
-        for i in range(1, len(images)):
-            output[i] = Tensor(images[i])
-
-        return [output]
+        output = np.zeros((len(images),*images[0].shape))
+        for i in range(len(images)):
+            output[i] = images[i]
+        return [Tensor(output)]
 
 NODE_CLASS_MAPPINGS = {
     "OpenPoseWarp": OpenPoseWarp,
