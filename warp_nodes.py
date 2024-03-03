@@ -2,7 +2,7 @@ from torch import Tensor
 import numpy as np
 import cv2
 import math
-from typing import Tuple
+from typing import Tuple, List
 
 hue_index = {
     'head': 0,
@@ -138,11 +138,17 @@ class OpenPoseWarp:
 
     def extract_points(self, hsv_pose_img:np.ndarray, body_parts:str) -> Tuple[Vector2,Vector2]:
         p1, p2 = Vector2(0,0), Vector2(0,0)
+        count = 0
         for body_part in body_parts:
             hue = hue_index.get(body_part, None)
             assert hue is not None, f"failed to find body part key '{body_part}' in hue_index dict"
             mask = cv2.inRange(hsv_pose_img, np.array([hue-2,0.98,0.58]), np.array([hue+2,1.02,0.62]))
             where = np.where(mask > 200)
+
+            if len(where[0]) == 0 or len(where[1]) == 0:
+                continue
+            else:
+                count += 1
 
             x1_h, x2_h = min(where[1]), max(where[1])
             y1_h, y2_h = min(np.where(mask[:,x1_h:x1_h+2] > 200)[0]), max(np.where(mask[:,x2_h-1:x2_h+1] > 200)[0])
@@ -156,11 +162,15 @@ class OpenPoseWarp:
             else:
                 p1 += Vector2(x1_v, y1_v)*self.rescale
                 p2 += Vector2(x2_v, y2_v)*self.rescale
-        return p1 * (1/len(body_parts)), p2 * (1/len(body_parts))
+        if count == 0:
+            return None, None
+        return p1 * (1.0/count), p2 * (1.0/count)
 
     def extract_comps_and_bound(self, hsv_pose_img:np.ndarray, keys1:str, keys2:str) -> Tuple[TransformComponent,TransformComponent,TransformBoundary]:
         p1, p2 = self.extract_points(hsv_pose_img, keys1)
         p3, p4 = self.extract_points(hsv_pose_img, keys2)
+        if any(p is None for p in (p1,p2,p3,p4)):
+            return None, None, None
         dists = [
             ((p1-p3).length(), lambda: (p2,p1,p3,p4)),
             ((p1-p4).length(), lambda: (p2,p1,p4,p3)),
@@ -182,20 +192,21 @@ class OpenPoseWarp:
         assert stretch_image.shape[0] == 1 and stretch_pose.shape[0] == 1, "cannot have a batch larger than 1 for stretch image and pose"
         stretch_image_np: np.ndarray = stretch_image[0].numpy()
         stretch_pose_np:  np.ndarray = stretch_pose[0].numpy()
-        target_pose_np:   np.ndarray = target_pose[0].numpy()
+        target_poses_np: List[np.ndarray] = [target_pose[i].numpy() for i in range(target_pose.shape[0])]
+        assert stretch_image_np.shape == target_poses_np[0].shape, f"stretch and target poses have to be the same size, found {stretch_image_np.shape} != {target_poses_np[0].shape}"
         if stretch_pose_np.shape != stretch_image_np.shape:
             r = list(stretch_image_np.shape[i] / stretch_pose_np.shape[i] for i in range(2))
         else:
             r = (1.0,1.0)
         self.rescale = Vector2(r[1], r[0])
 
-        images = []
-        full_img = np.ones((*stretch_image_np.shape[:-1],4)) * (0.5,0.5,0.5,1.0)
+        ret_images = []
+        dbg_images = []
 
         stretch_mask_np = self.clean_mask(stretch_mask)
         stretch_mask_np[stretch_mask_np < mask_threshold] = 0.0
         stretch_mask_np[stretch_mask_np > mask_threshold] = 1.0
-        if debug: images.append(stretch_mask_np.copy())
+        if debug: dbg_images.append(stretch_mask_np.copy())
 
         body_mask_np      = self.clean_mask(body_mask)      * stretch_mask_np
         right_arm_mask_np = self.clean_mask(right_arm_mask) * stretch_mask_np
@@ -203,56 +214,62 @@ class OpenPoseWarp:
         right_leg_mask_np = self.clean_mask(right_leg_mask) * stretch_mask_np
         left_leg_mask_np  = self.clean_mask(left_leg_mask)  * stretch_mask_np
 
-        loop = [
-            (left_arm_mask_np,  ('arm_left_upper',),  ('arm_left_lower',),  True),
-            (left_leg_mask_np,  ('leg_left_upper',),  ('leg_left_lower',),  True),
-            (body_mask_np,      ('head',),   ('torso_left','torso_right',), False),
-            (right_leg_mask_np, ('leg_right_upper',), ('leg_right_lower',), False),
-            (right_arm_mask_np, ('arm_right_upper',), ('arm_right_lower',), False),
-        ]
-        for mask_np, keys1, keys2, darken in loop:
-            input_img = np.ones((*stretch_image_np.shape[:-1],4))
-            input_img[:,:,:3] = stretch_image_np
-            input_img[:,:,3:] = mask_np
+        for target_pose_np in target_poses_np:
+            full_img = np.ones((*stretch_image_np.shape[:-1],4)) * (0.5,0.5,0.5,1.0)
+            loop = [
+                (left_arm_mask_np,  ('arm_left_upper',),  ('arm_left_lower',),  True),
+                (left_leg_mask_np,  ('leg_left_upper',),  ('leg_left_lower',),  True),
+                (body_mask_np,      ('head',),   ('torso_left','torso_right',), False),
+                (right_leg_mask_np, ('leg_right_upper',), ('leg_right_lower',), False),
+                (right_arm_mask_np, ('arm_right_upper',), ('arm_right_lower',), False),
+            ]
+            for mask_np, keys1, keys2, darken in loop:
+                input_img = np.ones((*stretch_image_np.shape[:-1],4))
+                input_img[:,:,:3] = stretch_image_np
+                input_img[:,:,3:] = mask_np
 
-            hsv_source_pose = cv2.cvtColor(stretch_pose_np, cv2.COLOR_BGR2HSV)
-            hsv_target_pose = cv2.cvtColor(target_pose_np, cv2.COLOR_BGR2HSV)
-            s_comp1, s_comp2, s_bound = self.extract_comps_and_bound(hsv_source_pose, keys1, keys2)
-            e_comp1, e_comp2, e_bound = self.extract_comps_and_bound(hsv_target_pose, keys1, keys2)
+                hsv_source_pose = cv2.cvtColor(stretch_pose_np, cv2.COLOR_BGR2HSV)
+                hsv_target_pose = cv2.cvtColor(target_pose_np, cv2.COLOR_BGR2HSV)
+                s_comp1, s_comp2, s_bound = self.extract_comps_and_bound(hsv_source_pose, keys1, keys2)
+                e_comp1, e_comp2, e_bound = self.extract_comps_and_bound(hsv_target_pose, keys1, keys2)
+                if s_comp1 is None or e_comp1 is None:
+                    continue
 
-            mask = np.zeros(input_img.shape[:-1])
-            s_bound.draw_mask_on(mask, (1.0,))
+                mask = np.zeros(input_img.shape[:-1])
+                s_bound.draw_mask_on(mask, (1.0,))
 
-            upper_img = input_img.copy()
-            upper_img[mask > 0.5] = (0,0,0,0)
-            lower_img = input_img.copy()
-            lower_img[mask < 0.5] = (0,0,0,0)
-            s_comp2.draw_boundary_on(lower_img, input_img, e_bound.diff*180/math.pi*2.5)
+                upper_img = input_img.copy()
+                upper_img[mask > 0.5] = (0,0,0,0)
+                lower_img = input_img.copy()
+                lower_img[mask < 0.5] = (0,0,0,0)
+                s_comp2.draw_boundary_on(lower_img, input_img, e_bound.diff*180/math.pi*2.5)
 
-            size = (input_img.shape[1], input_img.shape[0],)
-            upper_img = s_comp1.transform_image(upper_img, e_comp1, size)
-            lower_img = s_comp2.transform_image(lower_img, e_comp2, size)
+                size = (input_img.shape[1], input_img.shape[0],)
+                upper_img = s_comp1.transform_image(upper_img, e_comp1, size)
+                lower_img = s_comp2.transform_image(lower_img, e_comp2, size)
 
-            comb_img = lower_img.copy()
-            overlay_images(comb_img, upper_img)
-            if darken:
-                comb_img *= (back_darken,back_darken,back_darken,1.0)
-            overlay_images(full_img, comb_img)
+                comb_img = lower_img.copy()
+                overlay_images(comb_img, upper_img)
+                if darken:
+                    comb_img *= (back_darken,back_darken,back_darken,1.0)
+                overlay_images(full_img, comb_img)
 
-            if debug:
-                background_img = np.ones((*input_img.shape[:-1],3)) * 0.2
-                for loop_img in [input_img, upper_img, lower_img, comb_img]:
-                    loop_img = loop_img.copy()
-                    db_img = loop_img[:,:,:3]*loop_img[:,:,3:] + background_img*(1.0-loop_img[:,:,3:])
-                    s_comp1.draw_debug_on(db_img, (0,0,1,1))
-                    s_comp2.draw_debug_on(db_img, (.3,.3,1,1))
-                    s_bound.draw_debug_on(db_img, s_comp1.p2, 20, (1,0,0,1), 4)
-                    e_comp1.draw_debug_on(db_img, (0,1,0,1))
-                    e_comp2.draw_debug_on(db_img, (.3,1,.3,1))
-                    e_bound.draw_debug_on(db_img, e_comp1.p2, 20, (1,0,0,1), 4)
-                    images.append(db_img[:,:,:3])
+                if debug:
+                    background_img = np.ones((*input_img.shape[:-1],3)) * 0.2
+                    for loop_img in [input_img, upper_img, lower_img, comb_img]:
+                        loop_img = loop_img.copy()
+                        db_img = loop_img[:,:,:3]*loop_img[:,:,3:] + background_img*(1.0-loop_img[:,:,3:])
+                        s_comp1.draw_debug_on(db_img, (0,0,1,1))
+                        s_comp2.draw_debug_on(db_img, (.3,.3,1,1))
+                        s_bound.draw_debug_on(db_img, s_comp1.p2, 20, (1,0,0,1), 4)
+                        e_comp1.draw_debug_on(db_img, (0,1,0,1))
+                        e_comp2.draw_debug_on(db_img, (.3,1,.3,1))
+                        e_bound.draw_debug_on(db_img, e_comp1.p2, 20, (1,0,0,1), 4)
+                        dbg_images.append(db_img[:,:,:3])
+            
+            ret_images.append(full_img[:,:,:3])
 
-        images = [full_img[:,:,:3]] + images
+        images = ret_images + dbg_images
         output = np.ones((len(images),*images[0].shape))
         for i in range(len(images)):
             output[i] *= images[i]
