@@ -110,6 +110,8 @@ class OpenPoseWarp:
             "required": {
                 "stretch_image":  ("IMAGE",),
                 "stretch_pose":   ("IMAGE",),
+                "stretch_mask":   ("MASK",),
+                "mask_threshold": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "body_mask":      ("MASK",),
                 "right_arm_mask": ("MASK",),
                 "left_arm_mask":  ("MASK",),
@@ -162,10 +164,11 @@ class OpenPoseWarp:
         mask_np = mask[0].numpy()
         return mask_np.reshape((*mask_np.shape,1))
 
-    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor, debug:bool):
+    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, stretch_mask:Tensor, mask_threshold:float, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor, debug:bool):
         assert stretch_image.shape[0] == 1 and stretch_pose.shape[0] == 1, "cannot have a batch larger than 1 for stretch image and pose"
         stretch_image_np: np.ndarray = stretch_image[0].numpy()
         stretch_pose_np:  np.ndarray = stretch_pose[0].numpy()
+        target_pose_np:   np.ndarray = target_pose[0].numpy()
         if stretch_pose_np.shape != stretch_image_np.shape:
             r = list(stretch_image_np.shape[i] / stretch_pose_np.shape[i] for i in range(2))
         else:
@@ -174,29 +177,39 @@ class OpenPoseWarp:
 
         images = [stretch_image_np.copy()]
 
+        stretch_mask_np = self.clean_mask(stretch_mask).copy()
+        stretch_mask_np[stretch_mask_np < mask_threshold] = 0.0
+        stretch_mask_np[stretch_mask_np > mask_threshold] = 1.0
+        if debug: images.append(stretch_mask_np.copy())
+
         body_mask_np      = self.clean_mask(body_mask)
         right_arm_mask_np = self.clean_mask(right_arm_mask)
         left_arm_mask_np  = self.clean_mask(left_arm_mask)
         right_leg_mask_np = self.clean_mask(right_leg_mask)
         left_leg_mask_np  = self.clean_mask(left_leg_mask)
 
-        hsv_pose_img = cv2.cvtColor(stretch_pose_np, cv2.COLOR_BGR2HSV)
-        s_comp1, s_comp2, s_bound = self.extract_comps_and_bound(hsv_pose_img, 'leg_left_upper', 'leg_left_lower')
+        hsv_source_pose = cv2.cvtColor(stretch_pose_np, cv2.COLOR_BGR2HSV)
+        hsv_target_pose = cv2.cvtColor(target_pose_np, cv2.COLOR_BGR2HSV)
+        s_comp1, s_comp2, s_bound = self.extract_comps_and_bound(hsv_source_pose, 'leg_left_upper', 'leg_left_lower')
+        e_comp1, e_comp2, e_bound = self.extract_comps_and_bound(hsv_target_pose, 'leg_left_upper', 'leg_left_lower')
 
         background_img = np.ones(stretch_image_np.shape) * 0.5
 
         if debug:
-            db_img = stretch_image_np.copy()
-            db_img = db_img*left_leg_mask_np + background_img*(1.0-left_leg_mask_np)
-            s_comp1.draw_debug_on(db_img, (0,0,255))
-            s_comp2.draw_debug_on(db_img, (0,255,0))
-            s_bound.draw_debug_on(db_img, s_comp1.p2, 20, (255,0,0), 4)
-            images.append(db_img)
-            images.append(stretch_pose)
+            for inp_img in [stretch_image_np]:
+                db_img = inp_img.copy()
+                db_img = db_img*left_leg_mask_np + background_img*(1.0-left_leg_mask_np)
+                s_comp1.draw_debug_on(db_img, (0,0,1))
+                s_comp2.draw_debug_on(db_img, (.3,0,1))
+                s_bound.draw_debug_on(db_img, s_comp1.p2, 20, (1,0,0), 4)
+                e_comp1.draw_debug_on(db_img, (0,1,0))
+                e_comp2.draw_debug_on(db_img, (.3,1,0))
+                e_bound.draw_debug_on(db_img, e_comp1.p2, 20, (1,0,0), 4)
+                images.append(db_img)
 
-        output = np.zeros((len(images),*images[0].shape))
+        output = np.ones((len(images),*images[0].shape))
         for i in range(len(images)):
-            output[i] = images[i]
+            output[i] *= images[i]
         return [Tensor(output)]
 
 NODE_CLASS_MAPPINGS = {
