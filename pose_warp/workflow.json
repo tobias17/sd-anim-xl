@@ -1,13 +1,13 @@
 {
-  "last_node_id": 22,
-  "last_link_id": 31,
+  "last_node_id": 30,
+  "last_link_id": 69,
   "nodes": [
     {
-      "id": 16,
+      "id": 10,
       "type": "LoadImage",
       "pos": [
-        420,
-        50
+        419,
+        -325
       ],
       "size": {
         "0": 210,
@@ -21,7 +21,47 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            20
+            61
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "title": "Stretch Image",
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "source_image.png",
+        "image"
+      ]
+    },
+    {
+      "id": 16,
+      "type": "LoadImage",
+      "pos": [
+        666,
+        -111
+      ],
+      "size": {
+        "0": 210,
+        "1": 314
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            62
           ],
           "shape": 3,
           "slot_index": 0
@@ -43,56 +83,16 @@
       ]
     },
     {
-      "id": 22,
-      "type": "LoadImage",
-      "pos": [
-        420,
-        1190
-      ],
-      "size": {
-        "0": 210,
-        "1": 314
-      },
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            22
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "title": "Target Pose",
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "source_pose (1).png",
-        "image"
-      ]
-    },
-    {
       "id": 17,
       "type": "LoadImageMask",
       "pos": [
         660,
         290
       ],
-      "size": [
-        210,
-        318
-      ],
+      "size": {
+        "0": 210,
+        "1": 318
+      },
       "flags": {},
       "order": 2,
       "mode": 0,
@@ -101,7 +101,7 @@
           "name": "MASK",
           "type": "MASK",
           "links": [
-            28
+            64
           ],
           "shape": 3,
           "slot_index": 0
@@ -113,7 +113,7 @@
       },
       "widgets_values": [
         "torso_mask (1).png",
-        "alpha",
+        "red",
         "image"
       ]
     },
@@ -124,10 +124,10 @@
         420,
         430
       ],
-      "size": [
-        210,
-        318.0000123977661
-      ],
+      "size": {
+        "0": 210,
+        "1": 318
+      },
       "flags": {},
       "order": 3,
       "mode": 0,
@@ -136,7 +136,7 @@
           "name": "MASK",
           "type": "MASK",
           "links": [
-            29
+            65
           ],
           "shape": 3,
           "slot_index": 0
@@ -148,7 +148,7 @@
       },
       "widgets_values": [
         "right_arm_mask.png",
-        "alpha",
+        "red",
         "image"
       ]
     },
@@ -156,8 +156,8 @@
       "id": 19,
       "type": "LoadImageMask",
       "pos": [
-        650,
-        650
+        660,
+        670
       ],
       "size": {
         "0": 210,
@@ -171,7 +171,7 @@
           "name": "MASK",
           "type": "MASK",
           "links": [
-            30
+            66
           ],
           "shape": 3,
           "slot_index": 0
@@ -183,7 +183,7 @@
       },
       "widgets_values": [
         "left_arm_mask (1).png",
-        "alpha",
+        "red",
         "image"
       ]
     },
@@ -206,7 +206,7 @@
           "name": "MASK",
           "type": "MASK",
           "links": [
-            31
+            67
           ],
           "shape": 3,
           "slot_index": 0
@@ -218,141 +218,30 @@
       },
       "widgets_values": [
         "right_leg_mask.png",
-        "alpha",
+        "red",
         "image"
       ]
-    },
-    {
-      "id": 10,
-      "type": "LoadImage",
-      "pos": [
-        650,
-        -100
-      ],
-      "size": [
-        210,
-        314
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            11
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "title": "Stretch Image",
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "source_image.png",
-        "image"
-      ]
-    },
-    {
-      "id": 13,
-      "type": "OpenPoseWarp",
-      "pos": [
-        1249,
-        299
-      ],
-      "size": {
-        "0": 317.4000244140625,
-        "1": 166
-      },
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "stretch_image",
-          "type": "IMAGE",
-          "link": 11
-        },
-        {
-          "name": "stretch_pose",
-          "type": "IMAGE",
-          "link": 20
-        },
-        {
-          "name": "body_mask",
-          "type": "MASK",
-          "link": 28
-        },
-        {
-          "name": "right_arm_mask",
-          "type": "MASK",
-          "link": 29
-        },
-        {
-          "name": "left_arm_mask",
-          "type": "MASK",
-          "link": 30
-        },
-        {
-          "name": "right_leg_mask",
-          "type": "MASK",
-          "link": 31
-        },
-        {
-          "name": "left_leg_mask",
-          "type": "MASK",
-          "link": 23
-        },
-        {
-          "name": "target_pose",
-          "type": "IMAGE",
-          "link": 22
-        }
-      ],
-      "outputs": [
-        {
-          "name": "target_pose",
-          "type": "IMAGE",
-          "links": [
-            13
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OpenPoseWarp"
-      }
     },
     {
       "id": 21,
       "type": "LoadImageMask",
       "pos": [
-        649,
-        1025
+        660,
+        1050
       ],
       "size": {
         "0": 210,
         "1": 318
       },
       "flags": {},
-      "order": 7,
+      "order": 6,
       "mode": 0,
       "outputs": [
         {
           "name": "MASK",
           "type": "MASK",
           "links": [
-            23
+            68
           ],
           "shape": 3,
           "slot_index": 0
@@ -364,7 +253,82 @@
       },
       "widgets_values": [
         "left_leg_mask.png",
-        "alpha",
+        "red",
+        "image"
+      ]
+    },
+    {
+      "id": 22,
+      "type": "LoadImage",
+      "pos": [
+        413,
+        1196
+      ],
+      "size": {
+        "0": 210,
+        "1": 314
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            69
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "title": "Target Pose",
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "target_pose.png",
+        "image"
+      ]
+    },
+    {
+      "id": 28,
+      "type": "LoadImageMask",
+      "pos": [
+        416,
+        47
+      ],
+      "size": {
+        "0": 210,
+        "1": 318
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            63
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "title": "Stretch Mask",
+      "properties": {
+        "Node name for S&R": "LoadImageMask"
+      },
+      "widgets_values": [
+        "ComfyUI_00006_.png",
+        "red",
         "image"
       ]
     },
@@ -372,100 +336,188 @@
       "id": 11,
       "type": "PreviewImage",
       "pos": [
-        1662,
-        295
+        1611,
+        323
       ],
       "size": {
         "0": 390,
         "1": 679
       },
       "flags": {},
-      "order": 9,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 13
+          "link": 58
         }
       ],
       "properties": {
         "Node name for S&R": "PreviewImage"
       }
+    },
+    {
+      "id": 30,
+      "type": "OpenPoseWarp",
+      "pos": [
+        1111,
+        371
+      ],
+      "size": {
+        "0": 330,
+        "1": 242
+      },
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "stretch_image",
+          "type": "IMAGE",
+          "link": 61
+        },
+        {
+          "name": "stretch_pose",
+          "type": "IMAGE",
+          "link": 62
+        },
+        {
+          "name": "stretch_mask",
+          "type": "MASK",
+          "link": 63
+        },
+        {
+          "name": "body_mask",
+          "type": "MASK",
+          "link": 64
+        },
+        {
+          "name": "right_arm_mask",
+          "type": "MASK",
+          "link": 65
+        },
+        {
+          "name": "left_arm_mask",
+          "type": "MASK",
+          "link": 66
+        },
+        {
+          "name": "right_leg_mask",
+          "type": "MASK",
+          "link": 67
+        },
+        {
+          "name": "left_leg_mask",
+          "type": "MASK",
+          "link": 68
+        },
+        {
+          "name": "target_pose",
+          "type": "IMAGE",
+          "link": 69
+        }
+      ],
+      "outputs": [
+        {
+          "name": "target_pose",
+          "type": "IMAGE",
+          "links": [
+            58
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OpenPoseWarp"
+      },
+      "widgets_values": [
+        0.75,
+        true
+      ]
     }
   ],
   "links": [
     [
+      58,
+      30,
+      0,
       11,
+      0,
+      "IMAGE"
+    ],
+    [
+      61,
       10,
       0,
-      13,
+      30,
       0,
       "IMAGE"
     ],
     [
-      13,
-      13,
-      0,
-      11,
-      0,
-      "IMAGE"
-    ],
-    [
-      20,
+      62,
       16,
       0,
-      13,
+      30,
       1,
       "IMAGE"
     ],
     [
-      22,
-      22,
-      0,
-      13,
-      7,
-      "IMAGE"
-    ],
-    [
-      23,
-      21,
-      0,
-      13,
-      6,
-      "MASK"
-    ],
-    [
+      63,
       28,
-      17,
       0,
-      13,
+      30,
       2,
       "MASK"
     ],
     [
-      29,
-      18,
+      64,
+      17,
       0,
-      13,
+      30,
       3,
       "MASK"
     ],
     [
-      30,
-      19,
+      65,
+      18,
       0,
-      13,
+      30,
       4,
       "MASK"
     ],
     [
-      31,
-      20,
+      66,
+      19,
       0,
-      13,
+      30,
       5,
       "MASK"
+    ],
+    [
+      67,
+      20,
+      0,
+      30,
+      6,
+      "MASK"
+    ],
+    [
+      68,
+      21,
+      0,
+      30,
+      7,
+      "MASK"
+    ],
+    [
+      69,
+      22,
+      0,
+      30,
+      8,
+      "IMAGE"
     ]
   ],
   "groups": [],
