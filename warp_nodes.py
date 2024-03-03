@@ -6,11 +6,11 @@ from typing import Tuple
 
 hue_index = {
     'head': 0,
-    'leg_left_lower': 20,
-    'leg_left_upper': 40,
+    'leg_right_lower': 20,
+    'leg_right_upper': 40,
     'torso_left': 60,
-    'leg_right_lower': 80,
-    'leg_right_upper': 100,
+    'leg_left_lower': 80,
+    'leg_left_upper': 100,
     'torso_right': 120,
     'arm_left_lower': 140,
     'arm_left_upper': 160,
@@ -26,26 +26,26 @@ def to_circle(angle, normalize_to=0) -> float:
     return angle
 
 class Vector2:
-    def __init__(self, point:Tuple[float,float]):
-        self.x = point[0]
-        self.y = point[1]
+    def __init__(self, x:float, y:float):
+        self.x = x
+        self.y = y
     def point(self) -> Tuple[float,float]: return (self.x, self.y)
     def point_int(self) -> Tuple[int,int]: return (int(self.x), int(self.y))
-    def __sub__(self, o) -> 'Vector2': return Vector2([self.x - o.x, self.y - o.y])
-    def __add__(self, o) -> 'Vector2': return Vector2([self.x + o.x, self.y + o.y])
+    def __sub__(self, o) -> 'Vector2': return Vector2(self.x - o.x, self.y - o.y)
+    def __add__(self, o) -> 'Vector2': return Vector2(self.x + o.x, self.y + o.y)
     def angle(self) -> float: return math.atan2(self.y, self.x)
     def length(self) -> float: return math.sqrt(self.x**2 + self.y**2)
     def __str__(self) -> str: return f"Point(x={self.x},y={self.y})"
 
     def __mul__(self, o) -> 'Vector2':
-        if isinstance(o, type(self)): return Vector2([self.x * o.x, self.y * o.y])
-        else:                         return Vector2([self.x * o,   self.y * o  ])
+        if isinstance(o, type(self)): return Vector2(self.x * o.x, self.y * o.y)
+        else:                         return Vector2(self.x * o,   self.y * o  )
 
     def normalize(self, length=1) -> 'Vector2':
         assert length != 0, "Can not normalize a vector to length 0!"
         assert self.x != 0 or self.y != 0, "Can not normalize a vector of length 0!"
         div = self.length() / float(length)
-        return Vector2([self.x / div, self.y / div])
+        return Vector2(self.x / div, self.y / div)
 
 class TransformComponent:
     transform_offset = 40
@@ -60,7 +60,7 @@ class TransformComponent:
         root = self.p1
         start_angle = self.vec.angle()*180/math.pi + (90 if angle > 0 else 270)
         end_angle = start_angle + angle
-        move_vec = Vector2([math.cos(start_angle*math.pi/180), math.sin(start_angle*math.pi/180)])
+        move_vec = Vector2(math.cos(start_angle*math.pi/180), math.sin(start_angle*math.pi/180))
         for i in range(1, 50+1):
             point = (root + (move_vec * i)).point_int()
             color = [int(v) for v in list(ref_img[point[1], point[0]])]
@@ -92,11 +92,11 @@ class TransformBoundary:
 
         self.diff = to_circle(comp1.vec.angle() - comp2.vec.angle()) / 2
         self.angle = math.pi/2 + comp1.vec.angle() - self.diff
-        self.vec = Vector2([math.cos(self.angle), math.sin(self.angle)])
+        self.vec = Vector2(math.cos(self.angle), math.sin(self.angle))
     
     def draw_mask_on(self, img, color):
         angle = self.angle
-        mod_dist = Vector2([math.cos(angle - math.pi/2) * self.dist, math.sin(angle - math.pi/2) * self.dist])
+        mod_dist = Vector2(math.cos(angle - math.pi/2) * self.dist, math.sin(angle - math.pi/2) * self.dist)
         cv2.line(img, (self.comp1.p2 + mod_dist - self.vec*self.dist).point_int(), (self.comp1.p2 + mod_dist + self.vec*self.dist).point_int(), color, int(self.dist*2))
 
     def draw_debug_on(self, img, p1, length, color, size):
@@ -124,10 +124,7 @@ class OpenPoseWarp:
     RETURN_NAMES = ("target_pose",)
     FUNCTION = "open_pose_warp"
 
-    def scale_point(self, x, y) -> Tuple[int,int]:
-        return int(x*self.rescale[1]), int(y*self.rescale[0])
-
-    def extract_position(self, hsv_pose_img:np.ndarray, body_part:str) -> Tuple[Tuple[int,int],Tuple[int,int]]:
+    def extract_component(self, hsv_pose_img:np.ndarray, body_part:str) -> TransformComponent:
         hue = hue_index.get(body_part, None)
         assert hue is not None, f"failed to find body part key '{body_part}' in hue_index dict"
         mask = cv2.inRange(hsv_pose_img, np.array([hue-2,0.98,0.58]), np.array([hue+2,1.02,0.62]))
@@ -140,8 +137,8 @@ class OpenPoseWarp:
         x1_v, x2_v = min(np.where(mask[y1_v:y1_v+2,:] > 200)[1]), max(np.where(mask[y2_v-1:y2_v+1,:] > 200)[1])
 
         if ((x2_h-x1_h)**2 + (y2_h-y1_h)**2) > ((x2_v-x1_v)**2 + (y2_v-y1_v)**2):
-            return self.scale_point(x1_h, y1_h), self.scale_point(x2_h, y2_h)
-        return self.scale_point(x1_v, y1_v), self.scale_point(x2_v, y2_v)
+            return TransformComponent(Vector2(x1_h, y1_h)*self.rescale, Vector2(x2_h, y2_h)*self.rescale)
+        return     TransformComponent(Vector2(x1_v, y1_v)*self.rescale, Vector2(x2_v, y2_v)*self.rescale)
 
     def clean_mask(self, mask:Tensor) -> np.ndarray:
         assert mask.shape[0], f"masks must be of batch size 1, found {mask.shape[0]}"
@@ -153,9 +150,10 @@ class OpenPoseWarp:
         stretch_image = stretch_image[0].numpy()
         stretch_pose  = stretch_pose[0].numpy()
         if stretch_pose.shape != stretch_image.shape:
-            self.rescale = list(stretch_image.shape[i] / stretch_pose.shape[i] for i in range(2))
+            r = list(stretch_image.shape[i] / stretch_pose.shape[i] for i in range(2))
         else:
-            self.rescale = (1.0,1.0)
+            r = (1.0,1.0)
+        self.rescale = Vector2(*r[::-1])
 
         body_mask      = self.clean_mask(body_mask)
         right_arm_mask = self.clean_mask(right_arm_mask)
@@ -165,12 +163,15 @@ class OpenPoseWarp:
 
         hsv_pose_img = cv2.cvtColor(stretch_pose, cv2.COLOR_BGR2HSV)
 
-        p1_u, p2_u = self.extract_position(hsv_pose_img, 'leg_right_upper')
-        p1_l, p2_l = self.extract_position(hsv_pose_img, 'leg_right_lower')
+        c1 = self.extract_component(hsv_pose_img, 'leg_right_upper')
+        c2 = self.extract_component(hsv_pose_img, 'leg_right_lower')
+        b = TransformBoundary(c1, c2)
 
         background_img = np.ones(stretch_image.shape) * 0.5
 
         left_leg_img = stretch_image*left_leg_mask + background_img*(1.0-left_leg_mask)
+        c1.draw_debug_on(left_leg_img, (0,0,255))
+        c2.draw_debug_on(left_leg_img, (0,255,0))
 
         return [Tensor(left_leg_img).reshape((1,*left_leg_img.shape))]
 
