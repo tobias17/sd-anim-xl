@@ -4,6 +4,7 @@ import cv2
 from typing import Tuple
 
 hue_index = {
+    'head': 0,
     'leg_left_lower': 20,
     'leg_left_upper': 40,
     'torso_left': 60,
@@ -25,11 +26,11 @@ class OpenPoseWarp:
             "required": {
                 "stretch_image":  ("IMAGE",),
                 "stretch_pose":   ("IMAGE",),
-                "body_mask":      ("IMAGE",),
-                "right_arm_mask": ("IMAGE",),
-                "left_arm_mask":  ("IMAGE",),
-                "right_leg_mask": ("IMAGE",),
-                "left_leg_mask":  ("IMAGE",),
+                "body_mask":      ("MASK",),
+                "right_arm_mask": ("MASK",),
+                "left_arm_mask":  ("MASK",),
+                "right_leg_mask": ("MASK",),
+                "left_leg_mask":  ("MASK",),
                 "target_pose":    ("IMAGE",),
             }
         }
@@ -66,11 +67,13 @@ class OpenPoseWarp:
             self.rescale = list(stretch_image.shape[i] / stretch_pose.shape[i] for i in range(2))
         else:
             self.rescale = (1.0,1.0)
+        
+        print(right_arm_mask)
+        print(type(right_arm_mask))
+        print(right_arm_mask.shape)
 
         hsv_pose_img = cv2.cvtColor(stretch_pose, cv2.COLOR_BGR2HSV)
-
         p1, p2 = self.extract_position(hsv_pose_img, 'leg_right_upper')
-        print(p1, p2)
 
         stretch_image = stretch_image
         cv2.circle(stretch_image, p1, 3, (0,0,255), 8)
