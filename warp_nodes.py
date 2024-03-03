@@ -126,6 +126,7 @@ class OpenPoseWarp:
                 "right_leg_mask": ("MASK",),
                 "left_leg_mask":  ("MASK",),
                 "target_pose":    ("IMAGE",),
+                "back_darken":    ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "debug":          ("BOOLEAN", {"default": False}),
             }
         }
@@ -177,7 +178,7 @@ class OpenPoseWarp:
         mask_np = mask[0].numpy()
         return mask_np.reshape((*mask_np.shape,1)).copy()
 
-    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, stretch_mask:Tensor, mask_threshold:float, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor, debug:bool):
+    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, stretch_mask:Tensor, mask_threshold:float, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor, back_darken:float, debug:bool):
         assert stretch_image.shape[0] == 1 and stretch_pose.shape[0] == 1, "cannot have a batch larger than 1 for stretch image and pose"
         stretch_image_np: np.ndarray = stretch_image[0].numpy()
         stretch_pose_np:  np.ndarray = stretch_pose[0].numpy()
@@ -203,13 +204,13 @@ class OpenPoseWarp:
         left_leg_mask_np  = self.clean_mask(left_leg_mask)  * stretch_mask_np
 
         loop = [
-            (left_arm_mask_np,  ('arm_left_upper',),  ('arm_left_lower',),  0.7),
-            (left_leg_mask_np,  ('leg_left_upper',),  ('leg_left_lower',),  0.7),
-            (body_mask_np,      ('head',),   ('torso_left','torso_right',), 1.0),
-            (right_leg_mask_np, ('leg_right_upper',), ('leg_right_lower',), 1.0),
-            (right_arm_mask_np, ('arm_right_upper',), ('arm_right_lower',), 1.0),
+            (left_arm_mask_np,  ('arm_left_upper',),  ('arm_left_lower',),  True),
+            (left_leg_mask_np,  ('leg_left_upper',),  ('leg_left_lower',),  True),
+            (body_mask_np,      ('head',),   ('torso_left','torso_right',), False),
+            (right_leg_mask_np, ('leg_right_upper',), ('leg_right_lower',), False),
+            (right_arm_mask_np, ('arm_right_upper',), ('arm_right_lower',), False),
         ]
-        for mask_np, keys1, keys2, scale in loop:
+        for mask_np, keys1, keys2, darken in loop:
             input_img = np.ones((*stretch_image_np.shape[:-1],4))
             input_img[:,:,:3] = stretch_image_np
             input_img[:,:,3:] = mask_np
@@ -234,7 +235,8 @@ class OpenPoseWarp:
 
             comb_img = lower_img.copy()
             overlay_images(comb_img, upper_img)
-            comb_img *= (scale,scale,scale,1.0)
+            if darken:
+                comb_img *= (back_darken,back_darken,back_darken,1.0)
             overlay_images(full_img, comb_img)
 
             if debug:
