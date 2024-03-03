@@ -126,7 +126,7 @@ class OpenPoseWarp:
                 "right_leg_mask": ("MASK",),
                 "left_leg_mask":  ("MASK",),
                 "target_pose":    ("IMAGE",),
-                "debug":          ("BOOLEAN", {"default": True}),
+                "debug":          ("BOOLEAN", {"default": False}),
             }
         }
     
@@ -135,25 +135,31 @@ class OpenPoseWarp:
     RETURN_NAMES = ("target_pose",)
     FUNCTION = "open_pose_warp"
 
-    def extract_points(self, hsv_pose_img:np.ndarray, body_part:str) -> Tuple[Vector2,Vector2]:
-        hue = hue_index.get(body_part, None)
-        assert hue is not None, f"failed to find body part key '{body_part}' in hue_index dict"
-        mask = cv2.inRange(hsv_pose_img, np.array([hue-2,0.98,0.58]), np.array([hue+2,1.02,0.62]))
-        where = np.where(mask > 200)
+    def extract_points(self, hsv_pose_img:np.ndarray, body_parts:str) -> Tuple[Vector2,Vector2]:
+        p1, p2 = Vector2(0,0), Vector2(0,0)
+        for body_part in body_parts:
+            hue = hue_index.get(body_part, None)
+            assert hue is not None, f"failed to find body part key '{body_part}' in hue_index dict"
+            mask = cv2.inRange(hsv_pose_img, np.array([hue-2,0.98,0.58]), np.array([hue+2,1.02,0.62]))
+            where = np.where(mask > 200)
 
-        x1_h, x2_h = min(where[1]), max(where[1])
-        y1_h, y2_h = min(np.where(mask[:,x1_h:x1_h+2] > 200)[0]), max(np.where(mask[:,x2_h-1:x2_h+1] > 200)[0])
+            x1_h, x2_h = min(where[1]), max(where[1])
+            y1_h, y2_h = min(np.where(mask[:,x1_h:x1_h+2] > 200)[0]), max(np.where(mask[:,x2_h-1:x2_h+1] > 200)[0])
 
-        y1_v, y2_v = min(where[0]), max(where[0])
-        x1_v, x2_v = min(np.where(mask[y1_v:y1_v+2,:] > 200)[1]), max(np.where(mask[y2_v-1:y2_v+1,:] > 200)[1])
+            y1_v, y2_v = min(where[0]), max(where[0])
+            x1_v, x2_v = min(np.where(mask[y1_v:y1_v+2,:] > 200)[1]), max(np.where(mask[y2_v-1:y2_v+1,:] > 200)[1])
 
-        if ((x2_h-x1_h)**2 + (y2_h-y1_h)**2) > ((x2_v-x1_v)**2 + (y2_v-y1_v)**2):
-            return Vector2(x1_h, y1_h)*self.rescale, Vector2(x2_h, y2_h)*self.rescale
-        return     Vector2(x1_v, y1_v)*self.rescale, Vector2(x2_v, y2_v)*self.rescale
+            if ((x2_h-x1_h)**2 + (y2_h-y1_h)**2) > ((x2_v-x1_v)**2 + (y2_v-y1_v)**2):
+                p1 += Vector2(x1_h, y1_h)*self.rescale
+                p2 += Vector2(x2_h, y2_h)*self.rescale
+            else:
+                p1 += Vector2(x1_v, y1_v)*self.rescale
+                p2 += Vector2(x2_v, y2_v)*self.rescale
+        return p1 * (1/len(body_parts)), p2 * (1/len(body_parts))
 
-    def extract_comps_and_bound(self, hsv_pose_img:np.ndarray, key1:str, key2:str) -> Tuple[TransformComponent,TransformComponent,TransformBoundary]:
-        p1, p2 = self.extract_points(hsv_pose_img, key1)
-        p3, p4 = self.extract_points(hsv_pose_img, key2)
+    def extract_comps_and_bound(self, hsv_pose_img:np.ndarray, keys1:str, keys2:str) -> Tuple[TransformComponent,TransformComponent,TransformBoundary]:
+        p1, p2 = self.extract_points(hsv_pose_img, keys1)
+        p3, p4 = self.extract_points(hsv_pose_img, keys2)
         dists = [
             ((p1-p3).length(), lambda: (p2,p1,p3,p4)),
             ((p1-p4).length(), lambda: (p2,p1,p4,p3)),
@@ -161,7 +167,6 @@ class OpenPoseWarp:
             ((p2-p4).length(), lambda: (p1,p2,p4,p3)),
         ]
         dists = sorted(dists, key=lambda v: v[0])
-        print(dists)
         p1,p2,p3,p4 = dists[0][1]()
         p2 = p3 = (p2+p3)*0.5
         c1,c2 = TransformComponent(p1,p2), TransformComponent(p3,p4)
@@ -198,20 +203,21 @@ class OpenPoseWarp:
         left_leg_mask_np  = self.clean_mask(left_leg_mask)  * stretch_mask_np
 
         loop = [
-            (left_arm_mask_np,  'arm_left_upper',  'arm_left_lower' ),
-            (left_leg_mask_np,  'leg_left_upper',  'leg_left_lower' ),
-            (right_leg_mask_np, 'leg_right_upper', 'leg_right_lower'),
-            (right_arm_mask_np, 'arm_right_upper', 'arm_right_lower'),
+            (left_arm_mask_np,  ('arm_left_upper',),  ('arm_left_lower',),  0.7),
+            (left_leg_mask_np,  ('leg_left_upper',),  ('leg_left_lower',),  0.7),
+            (body_mask_np,      ('head',),   ('torso_left','torso_right',), 1.0),
+            (right_leg_mask_np, ('leg_right_upper',), ('leg_right_lower',), 1.0),
+            (right_arm_mask_np, ('arm_right_upper',), ('arm_right_lower',), 1.0),
         ]
-        for mask_np, key1, key2 in loop:
+        for mask_np, keys1, keys2, scale in loop:
             input_img = np.ones((*stretch_image_np.shape[:-1],4))
             input_img[:,:,:3] = stretch_image_np
             input_img[:,:,3:] = mask_np
 
             hsv_source_pose = cv2.cvtColor(stretch_pose_np, cv2.COLOR_BGR2HSV)
             hsv_target_pose = cv2.cvtColor(target_pose_np, cv2.COLOR_BGR2HSV)
-            s_comp1, s_comp2, s_bound = self.extract_comps_and_bound(hsv_source_pose, key1, key2)
-            e_comp1, e_comp2, e_bound = self.extract_comps_and_bound(hsv_target_pose, key1, key2)
+            s_comp1, s_comp2, s_bound = self.extract_comps_and_bound(hsv_source_pose, keys1, keys2)
+            e_comp1, e_comp2, e_bound = self.extract_comps_and_bound(hsv_target_pose, keys1, keys2)
 
             mask = np.zeros(input_img.shape[:-1])
             s_bound.draw_mask_on(mask, (1.0,))
@@ -228,6 +234,7 @@ class OpenPoseWarp:
 
             comb_img = lower_img.copy()
             overlay_images(comb_img, upper_img)
+            comb_img *= (scale,scale,scale,1.0)
             overlay_images(full_img, comb_img)
 
             if debug:
