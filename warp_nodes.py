@@ -209,16 +209,6 @@ class OpenPoseWarp:
             diff_mask[:,:,c] = np.abs(stretch_image_np[:,:,c] - stretch_image_np[:,:,(c+1)%3])
         gray_mask   = np.mean(diff_mask, axis=-1, keepdims=True)
         middle_mask = np.abs(stretch_image_np.mean(axis=-1, keepdims=True) - 0.5)
-        print(gray_mask)
-        print(np.min(gray_mask))
-        print(np.max(gray_mask))
-        print(np.mean(gray_mask))
-        print(np.std(gray_mask))
-        print(middle_mask)
-        print(np.min(middle_mask))
-        print(np.max(middle_mask))
-        print(np.mean(middle_mask))
-        print(np.std(middle_mask))
         stretch_mask = np.zeros(gray_mask.shape)
         stretch_mask[gray_mask   > stretch_mask_a] = 1.0
         stretch_mask[middle_mask > stretch_mask_b] = 1.0
