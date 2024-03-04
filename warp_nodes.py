@@ -217,13 +217,13 @@ class OpenPoseWarp:
         for target_pose_np in target_poses_np:
             full_img = np.ones((*stretch_image_np.shape[:-1],4)) * (0.5,0.5,0.5,1.0)
             loop = [
-                (left_arm_mask_np,  ('arm_left_upper',),  ('arm_left_lower',),  True),
-                (left_leg_mask_np,  ('leg_left_upper',),  ('leg_left_lower',),  True),
-                (body_mask_np,      ('head',),   ('torso_left','torso_right',), False),
-                (right_leg_mask_np, ('leg_right_upper',), ('leg_right_lower',), False),
-                (right_arm_mask_np, ('arm_right_upper',), ('arm_right_lower',), False),
+                (left_arm_mask_np,  ('arm_left_upper',),  ('arm_left_lower',),  True,  False),
+                (left_leg_mask_np,  ('leg_left_upper',),  ('leg_left_lower',),  True,  False),
+                (body_mask_np,      ('head',),   ('torso_left','torso_right',), False, True ),
+                (right_leg_mask_np, ('leg_right_upper',), ('leg_right_lower',), False, False),
+                (right_arm_mask_np, ('arm_right_upper',), ('arm_right_lower',), False, False),
             ]
-            for mask_np, keys1, keys2, darken in loop:
+            for mask_np, keys1, keys2, darken, norm_upper_length in loop:
                 input_img = np.ones((*stretch_image_np.shape[:-1],4))
                 input_img[:,:,:3] = stretch_image_np
                 input_img[:,:,3:] = mask_np
@@ -234,6 +234,11 @@ class OpenPoseWarp:
                 e_comp1, e_comp2, e_bound = self.extract_comps_and_bound(hsv_target_pose, keys1, keys2)
                 if s_comp1 is None or e_comp1 is None:
                     continue
+                if norm_upper_length:
+                    # print(f"Before: {s_comp1.p1}, {s_comp1.p2}")
+                    s_comp1 = TransformComponent(s_comp1.p2 - (s_comp1.vec.normalize() * 10), s_comp1.p2)
+                    e_comp1 = TransformComponent(e_comp1.p2 - (e_comp1.vec.normalize() * 10), e_comp1.p2)
+                    # print(f"After: {s_comp1.p1}, {s_comp1.p2}")
 
                 mask = np.zeros(input_img.shape[:-1])
                 s_bound.draw_mask_on(mask, (1.0,))
