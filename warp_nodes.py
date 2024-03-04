@@ -118,8 +118,8 @@ class OpenPoseWarp:
             "required": {
                 "stretch_image":  ("IMAGE",),
                 "stretch_pose":   ("IMAGE",),
-                "stretch_mask":   ("MASK",),
-                "mask_threshold": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "stretch_mask_a": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 0.3, "step": 0.01}),
+                "stretch_mask_b": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 0.3, "step": 0.01}),
                 "body_mask":      ("MASK",),
                 "right_arm_mask": ("MASK",),
                 "left_arm_mask":  ("MASK",),
@@ -188,7 +188,7 @@ class OpenPoseWarp:
         mask_np = mask[0].numpy()
         return mask_np.reshape((*mask_np.shape,1)).copy()
 
-    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, stretch_mask:Tensor, mask_threshold:float, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor, back_darken:float, debug:bool):
+    def open_pose_warp(self, stretch_image:Tensor, stretch_pose:Tensor, stretch_mask_a:float, stretch_mask_b:float, body_mask:Tensor, right_arm_mask:Tensor, left_arm_mask:Tensor, right_leg_mask:Tensor, left_leg_mask:Tensor, target_pose:Tensor, back_darken:float, debug:bool):
         assert stretch_image.shape[0] == 1 and stretch_pose.shape[0] == 1, "cannot have a batch larger than 1 for stretch image and pose"
         stretch_image_np: np.ndarray = stretch_image[0].numpy()
         stretch_pose_np:  np.ndarray = stretch_pose[0].numpy()
@@ -199,20 +199,43 @@ class OpenPoseWarp:
         else:
             r = (1.0,1.0)
         self.rescale = Vector2(r[1], r[0])
+        stretch_mask_a *= 0.01
 
         ret_images = []
         dbg_images = []
 
-        stretch_mask_np = self.clean_mask(stretch_mask)
-        stretch_mask_np[stretch_mask_np < mask_threshold] = 0.0
-        stretch_mask_np[stretch_mask_np > mask_threshold] = 1.0
-        if debug: dbg_images.append(stretch_mask_np.copy())
+        diff_mask = np.zeros(stretch_image_np.shape)
+        for c in range(3):
+            diff_mask[:,:,c] = np.abs(stretch_image_np[:,:,c] - stretch_image_np[:,:,(c+1)%3])
+        gray_mask   = np.mean(diff_mask, axis=-1, keepdims=True)
+        middle_mask = np.abs(stretch_image_np.mean(axis=-1, keepdims=True) - 0.5)
+        print(gray_mask)
+        print(np.min(gray_mask))
+        print(np.max(gray_mask))
+        print(np.mean(gray_mask))
+        print(np.std(gray_mask))
+        print(middle_mask)
+        print(np.min(middle_mask))
+        print(np.max(middle_mask))
+        print(np.mean(middle_mask))
+        print(np.std(middle_mask))
+        stretch_mask = np.zeros(gray_mask.shape)
+        stretch_mask[gray_mask   > stretch_mask_a] = 1.0
+        stretch_mask[middle_mask > stretch_mask_b] = 1.0
+        if debug:
+            gm_d = np.zeros(gray_mask.shape)
+            mm_d = np.zeros(gray_mask.shape)
+            gm_d[gray_mask   > stretch_mask_a] = 1.0
+            mm_d[middle_mask > stretch_mask_b] = 1.0
+            dbg_images.append(gm_d)
+            dbg_images.append(mm_d)
+            dbg_images.append(stretch_mask.copy())
 
-        body_mask_np      = self.clean_mask(body_mask)      * stretch_mask_np
-        right_arm_mask_np = self.clean_mask(right_arm_mask) * stretch_mask_np
-        left_arm_mask_np  = self.clean_mask(left_arm_mask)  * stretch_mask_np
-        right_leg_mask_np = self.clean_mask(right_leg_mask) * stretch_mask_np
-        left_leg_mask_np  = self.clean_mask(left_leg_mask)  * stretch_mask_np
+        body_mask_np      = self.clean_mask(body_mask)      * stretch_mask
+        right_arm_mask_np = self.clean_mask(right_arm_mask) * stretch_mask
+        left_arm_mask_np  = self.clean_mask(left_arm_mask)  * stretch_mask
+        right_leg_mask_np = self.clean_mask(right_leg_mask) * stretch_mask
+        left_leg_mask_np  = self.clean_mask(left_leg_mask)  * stretch_mask
 
         for target_pose_np in target_poses_np:
             full_img = np.ones((*stretch_image_np.shape[:-1],4)) * (0.5,0.5,0.5,1.0)
