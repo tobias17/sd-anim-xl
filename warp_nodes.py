@@ -293,6 +293,24 @@ class OpenPoseWarp:
             output[i] *= images[i]
         return [Tensor(output)]
 
+
+class GetBackgroundMask:
+    @classmethod
+    def INPUT_TYPES(self):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+            }
+        }
+    
+    CATEGORY = "PoseWarp"
+    RETURN_TYPES = ("MASK",)
+    RETURN_NAMES = ("mask",)
+    FUNCTION = "get_background_mask"
+
+    def get_background_mask(self, image:Tensor) -> Tensor:
+        pass
+
 NODE_CLASS_MAPPINGS = {
     "OpenPoseWarp": OpenPoseWarp,
 
