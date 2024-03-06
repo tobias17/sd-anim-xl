@@ -2,6 +2,7 @@ from torch import Tensor
 import numpy as np
 import cv2
 import math
+import rembg
 from typing import Tuple, List
 
 hue_index = {
@@ -294,7 +295,7 @@ class OpenPoseWarp:
         return [Tensor(output)]
 
 
-class GetBackgroundMask:
+class RembgSubjectMask:
     @classmethod
     def INPUT_TYPES(self):
         return {
@@ -306,16 +307,20 @@ class GetBackgroundMask:
     CATEGORY = "PoseWarp"
     RETURN_TYPES = ("MASK",)
     RETURN_NAMES = ("mask",)
-    FUNCTION = "get_background_mask"
+    FUNCTION = "get_subject_mask"
 
-    def get_background_mask(self, image:Tensor) -> Tensor:
-        pass
+    def get_subject_mask(self, image:Tensor) -> Tensor:
+        assert image.shape[0] == 1, f"batch sizes > 1 are not currently supported"
+        image_np = (image[0].numpy() * 255).astype(np.uint8)
+        mask = rembg.remove(image_np)[:,:,-1] / 255.0
+        return [Tensor(mask).reshape((1,*mask.shape))]
 
 NODE_CLASS_MAPPINGS = {
     "OpenPoseWarp": OpenPoseWarp,
-
+    "RembgSubjectMask": RembgSubjectMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "OpenPoseWarp": "OpenPoseWarp",
+    "OpenPoseWarp": "OpenPose Warp",
+    "RembgSubjectMask": "Rembg Subject Mask",
 }
